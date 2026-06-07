@@ -44,23 +44,21 @@ docker compose up -d
 > limit, so `fetch_squads.py` takes a few minutes. Both scripts upsert and are safe to
 > re-run.
 
-## Notebooks
+## Notebooks — learning polygon
+
+The notebooks are **empty, guided scaffolds** for learning ML by doing. Each section's
+markdown states *what* to achieve; the code cells are `# TODO`s for you to implement —
+search, read docs, experiment. Nothing is solved for you.
 
 ```bash
-.venv/bin/jupyter notebook            # interactive
-# or run headless:
-.venv/bin/jupyter nbconvert --to notebook --execute notebooks/01_eda_arsenal.ipynb \
-  --output 01_eda_arsenal_executed.ipynb
-.venv/bin/jupyter nbconvert --to notebook --execute notebooks/02_model_arsenal.ipynb \
-  --output 02_model_arsenal_executed.ipynb
+.venv/bin/jupyter notebook
 ```
 
-- **`01_eda_arsenal.ipynb`** — exploratory analysis (results, goals over time, results
-  by competition, toughest opponents, squad profile). Charts are written to `data/*.png`.
-- **`02_model_arsenal.ipynb`** — feature engineering and modelling. Compares a baseline,
-  Logistic Regression, Random Forest and Gradient Boosting, picks the best by
-  cross-validated F1-macro, and saves it to `models/`. Key rules: rolling features use
-  `.shift(1)` to avoid leakage, and the train/test split is chronological (never shuffled).
+- **`01_eda_arsenal.ipynb`** — explore the data and look for signals (result
+  distribution, home/away, goals over time, opponents, form, squad).
+- **`02_model_arsenal.ipynb`** — frame the problem, engineer features (mind data
+  leakage!), split for time series, train and compare models, evaluate, and save your
+  best model to `models/`.
 
 ## Database
 
@@ -105,9 +103,9 @@ FROM vw_arsenal_matches ORDER BY utc_date DESC LIMIT 10;
 │   ├── migrate.py          # tracked migration runner
 │   ├── fetch_arsenal.py    # matches + competitions/seasons/teams
 │   └── fetch_squads.py     # players for Arsenal + every opponent
-├── notebooks/              # EDA + modelling
-├── models/                 # saved model + features.json
-└── data/                   # Postgres volume (gitignored) + exported charts
+├── notebooks/              # learning scaffolds (EDA + modelling)
+├── models/                 # where you save your trained model (empty until then)
+└── data/                   # Postgres volume (gitignored) + any charts you export
 ```
 
 ## Notes

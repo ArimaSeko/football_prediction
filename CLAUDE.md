@@ -34,12 +34,9 @@ Populate the database (order matters — matches first, then squads):
 .venv/bin/python3 scripts/fetch_squads.py    # players for Arsenal + every opponent faced
 ```
 
-Run the notebooks headless (produces the `*_executed.ipynb` files and writes PNGs to `data/`):
+Open the notebooks (interactive):
 ```bash
-.venv/bin/jupyter nbconvert --to notebook --execute notebooks/01_eda_arsenal.ipynb \
-  --output 01_eda_arsenal_executed.ipynb
-.venv/bin/jupyter nbconvert --to notebook --execute notebooks/02_model_arsenal.ipynb \
-  --output 02_model_arsenal_executed.ipynb
+.venv/bin/jupyter notebook
 ```
 
 ## Architecture
@@ -60,16 +57,13 @@ The pipeline is a one-directional flow: **API → Postgres → notebooks → mod
 
 3. **Views** (defined in `migrations/v003_expand_full_payload.sql`):
    - `vw_match_details` — general readable view of any match (team/competition names resolved, `score` text like `'2-1'`, venue, attendance).
-   - `vw_arsenal_matches` — Arsenal-centric (team id 57): one row per match with `opponent`, `venue_side`, `arsenal_goals`/`opponent_goals`, `result` (Win/Draw/Loss), and `points` (3/1/0). This mirrors the result/points derivation the notebooks currently do in pandas and can replace that logic.
+   - `vw_arsenal_matches` — Arsenal-centric (team id 57): one row per match with `opponent`, `venue_side`, `arsenal_goals`/`opponent_goals`, `result` (Win/Draw/Loss), and `points` (3/1/0). A convenient starting point for the EDA/model notebooks.
 
-4. **Modeling** (`notebooks/`). `01_eda_arsenal.ipynb` is exploratory analysis; `02_model_arsenal.ipynb` is the model pipeline. Key conventions to preserve when editing model code:
-   - **No data leakage**: all rolling features use `.shift(1)` so a match only ever sees *past* matches.
-   - **Chronological split**, never shuffle — the last 10 matches are the test set.
-   - Compares Baseline / LogisticRegression / RandomForest / GradientBoosting (sklearn `Pipeline` with `StandardScaler`); selects the best by cross-validated F1-macro.
+4. **Notebooks** (`notebooks/`) are intentionally **empty learning scaffolds** — the owner is learning ML hands-on. `01_eda_arsenal.ipynb` (EDA) and `02_model_arsenal.ipynb` (modeling) contain markdown cells stating *what* each step should achieve and empty `# TODO` code cells. **Do not fill in the ML solutions** unless explicitly asked — the point is for the owner to implement them. If asked for help, prefer hints/explanations over finished code.
 
-5. **Artifacts** (`models/`). The notebook saves the winning model as `models/<name>.joblib` plus `models/features.json` (the ordered feature list + model name) used for inference. The feature set is currently: `is_home`, `is_ucl`, `form_last5`, `goals_scored_avg5`, `goals_conceded_avg5`, `goal_diff_avg5`, `win_streak`, `days_rest`, `match_number`. If you change features in the notebook, `features.json` must stay in sync.
+5. **Artifacts** (`models/`). Output directory — currently empty. Step 10 of the model notebook is where the owner saves their trained model (`<name>.joblib`) and a `features.json` (the ordered feature list it expects); keep the two in sync when (re)generated.
 
 ## Notes
 
-- `data/postgres/` is the live Postgres data volume — do not edit or commit it (gitignored). PNGs in `data/` are notebook outputs.
+- `data/postgres/` is the live Postgres data volume — do not edit or commit it (gitignored). Any chart PNGs the owner exports from the notebooks also land in `data/`.
 - `src/` is currently empty (placeholder for future inference/app code).
