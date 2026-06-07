@@ -1,13 +1,10 @@
--- Migration: store the full football-data.org v4 API payload + add match views.
+-- v003 — Store the full football-data.org v4 API payload + match views
 --
--- The original schema kept only a hand-picked subset of API fields. This adds
--- typed columns for the useful flat fields plus a `raw JSONB` column on every
--- ingested table that holds the complete API object (so nothing is ever lost,
--- including nested arrays like goals/lineup/bookings and paid-tier fields).
---
--- Idempotent (ADD COLUMN IF NOT EXISTS / CREATE OR REPLACE VIEW) — safe to re-run.
--- Apply to a live DB with:
---   docker exec -i football_db psql -U football -d football_prediction < scripts/migrate_expand_schema.sql
+-- Earlier versions kept only a hand-picked subset of API fields. This adds typed
+-- columns for the useful flat fields plus a `raw JSONB` column on every ingested
+-- table holding the complete API object (so nothing is ever lost, including nested
+-- arrays like goals/lineup/bookings and paid-tier fields). Finishes with two
+-- readable match views.
 
 -- ---------------------------------------------------------------- competitions
 ALTER TABLE competitions ADD COLUMN IF NOT EXISTS type      TEXT;

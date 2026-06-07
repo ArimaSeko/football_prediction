@@ -19,8 +19,13 @@ Secrets and connection settings live in `.env` (copy from `.env.example`). Requi
 
 Start / stop the database:
 ```bash
-docker compose up -d        # Postgres 16 on localhost:5432, initialized from scripts/init.sql
+docker compose up -d        # Postgres 16 on localhost:5432; a fresh volume runs migrations/v*.sql in order
 docker compose down
+```
+
+Apply pending DB migrations (tracked via `schema_migrations`; safe to re-run):
+```bash
+.venv/bin/python3 scripts/migrate.py
 ```
 
 Populate the database (order matters — matches first, then squads):
@@ -43,17 +48,17 @@ The pipeline is a one-directional flow: **API → Postgres → notebooks → mod
 
 1. **Ingestion** (`scripts/`). `fetch_arsenal.py` and `fetch_squads.py` use raw `psycopg2` and `INSERT ... ON CONFLICT DO UPDATE` upserts, so they are idempotent and safe to re-run. Every API call goes through a `get()` helper that sleeps 6s afterward to respect the free tier's 10 req/min limit. Arsenal is hardcoded as team id `57`; `fetch_squads.py` derives the opponent set by querying which teams appear in Arsenal's matches.
 
-2. **Schema** (`scripts/init.sql`). Applied automatically by Docker on first DB creation (mounted into `/docker-entrypoint-initdb.d/`). Core tables: `competitions`, `seasons`, `teams`, `matches`, `team_standings`, `players`, `team_players`. `team_players` links players to teams *per season* (`season_year`, e.g. 2024 = 2024/25 season) because players change clubs.
+2. **Schema** (`migrations/`). Versioned, idempotent SQL migrations (`v001`, `v002`, …) are the single source of truth — see `migrations/README.md` for the convention. Docker mounts the directory into `/docker-entrypoint-initdb.d`, so a fresh `data/postgres/` volume replays every `v*.sql` in order on first boot. Core tables: `competitions`, `seasons`, `teams`, `matches`, `team_standings`, `players`, `team_players`. `team_players` links players to teams *per season* (`season_year`, e.g. 2024 = 2024/25 season) because players change clubs.
 
-   **"Store everything" pattern**: every ingested table keeps typed columns for the useful flat API fields *plus* a `raw JSONB` column holding the complete API object, so nothing is lost — including nested arrays (`goals`, `lineup`, `bookings`, `substitutions`) and paid-tier fields that come back `null`/empty on the free tier. When adding a field, prefer reading it out of an existing `raw` column over re-fetching.
+   **"Store everything" pattern** (introduced in `v003`): every ingested table keeps typed columns for the useful flat API fields *plus* a `raw JSONB` column holding the complete API object, so nothing is lost — including nested arrays (`goals`, `lineup`, `bookings`, `substitutions`) and paid-tier fields that come back `null`/empty on the free tier. When adding a field, prefer reading it out of an existing `raw` column over re-fetching.
 
-   **Migrations**: `init.sql` only runs on a *fresh* `data/postgres/` volume, so schema changes to a live DB need an `ALTER` migration applied manually:
+   **Applying migrations**: `scripts/migrate.py` is the tracked runner — it applies only the `vNNN` files not yet recorded in the `schema_migrations` table and records each, so nothing runs twice. To change the schema, add the next `vNNN_*.sql` file (never edit an applied one) and run:
    ```bash
-   docker exec -i football_db psql -U football -d football_prediction < scripts/migrate_expand_schema.sql
+   .venv/bin/python3 scripts/migrate.py
    ```
-   `migrate_expand_schema.sql` (idempotent `ADD COLUMN IF NOT EXISTS` + the views) is the migration that introduced the full-payload columns and views; `migrate_add_players.sql` is the older players/team_players DDL. Keep `init.sql` and the migrations in sync when changing the schema.
+   Docker also auto-runs the `v*.sql` files on a *fresh* volume (fast bootstrap, but doesn't populate `schema_migrations`); the first `migrate.py` run then baselines it idempotently.
 
-3. **Views** (defined in both `init.sql` and `migrate_expand_schema.sql`):
+3. **Views** (defined in `migrations/v003_expand_full_payload.sql`):
    - `vw_match_details` — general readable view of any match (team/competition names resolved, `score` text like `'2-1'`, venue, attendance).
    - `vw_arsenal_matches` — Arsenal-centric (team id 57): one row per match with `opponent`, `venue_side`, `arsenal_goals`/`opponent_goals`, `result` (Win/Draw/Loss), and `points` (3/1/0). This mirrors the result/points derivation the notebooks currently do in pandas and can replace that logic.
 
